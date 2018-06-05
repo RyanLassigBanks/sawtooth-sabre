@@ -1,0 +1,21 @@
+[[package]]
+name = "intkey"
+version = "0.1.0"
+dependencies = [
+ "sabre-sdk 0.1.0",
+]
+
+[[package]]
+name = "protobuf"
+version = "2.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "sabre-sdk"
+version = "0.1.0"
+dependencies = [
+ "protobuf 2.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[metadata]
+"checksum protobuf 2.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "a163be69698a5cb7baa28819474344d3a268b3f3e41877e61d5555e3d3add1af"

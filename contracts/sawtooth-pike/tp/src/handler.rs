@@ -17,10 +17,20 @@ use crypto::digest::Digest;
 use crypto::sha2::Sha512;
 use std::collections::HashMap;
 
-use sawtooth_sdk::processor::handler::ApplyError;
-use sawtooth_sdk::processor::handler::TransactionContext;
-use sawtooth_sdk::processor::handler::TransactionHandler;
-use sawtooth_sdk::messages::processor::TpProcessRequest;
+cfg_if! {
+    if #[cfg(target_arch = "wasm32")] {
+        use sabre_sdk::ApplyError;
+        use sabre_sdk::TransactionContext;
+        use sabre_sdk::TransactionHandler;
+        use sabre_sdk::TpProcessRequest;
+        use sabre_sdk::{WasmPtr, execute_entrypoint};
+    } else {
+        use sawtooth_sdk::processor::handler::ApplyError;
+        use sawtooth_sdk::processor::handler::TransactionContext;
+        use sawtooth_sdk::processor::handler::TransactionHandler;
+        use sawtooth_sdk::messages::processor::TpProcessRequest;
+    }
+}
 
 use protos::payload::{CreateAgentAction, CreateOrganizationAction, CreateSmartPermissionAction,
                       DeleteSmartPermissionAction, PikePayload,
@@ -371,6 +381,7 @@ impl TransactionHandler for PikeTransactionHandler {
         let signer = request.get_header().get_signer_public_key();
         let mut state = PikeState::new(context);
 
+        #[cfg(not(target_arch = "wasm32"))]
         info!(
             "{:?} {:?} {:?}",
             payload.get_action(),

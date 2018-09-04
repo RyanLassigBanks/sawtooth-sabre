@@ -17,6 +17,8 @@ use std::string::FromUtf8Error;
 use std::error::Error as StdError;
 use std::fmt;
 
+use std::time::Instant;
+
 use sawtooth_sdk::processor::handler::{ContextError, TransactionContext};
 use wasm_executor::wasmi::{Error, Externals, FuncInstance, FuncRef, HostError, MemoryDescriptor,
                            MemoryInstance, MemoryRef, ModuleImportResolver, RuntimeArgs,
@@ -245,6 +247,7 @@ impl Externals for WasmExternals {
         index: usize,
         args: RuntimeArgs,
     ) -> Result<Option<RuntimeValue>, Trap> {
+        let timer = Instant::now();
         match index {
             GET_STATE_IDX => {
                 let head_ptr: u32 = args.nth(0);
@@ -267,6 +270,10 @@ impl Externals for WasmExternals {
 
                 let raw_ptr = self.write_data(state)?;
 
+
+                info!("GET_STATE Execution time: {} secs {} ms",
+                      timer.elapsed().as_secs(), timer.elapsed().subsec_millis());
+
                 Ok(Some(RuntimeValue::I32(raw_ptr as i32)))
             }
             SET_STATE_IDX => {
@@ -279,15 +286,19 @@ impl Externals for WasmExternals {
                 let state = self.ptr_to_vec(state_ptr as u32)?;
                 let mut sets = HashMap::new();
                 sets.insert(addr, state);
-                match self.context.set_state(sets){
+
+                match self.context.set_state(sets) {
                     Ok(()) => {
+                    info!("SET_STATE Execution time: {} secs {} ms",
+                          timer.elapsed().as_secs(), timer.elapsed().subsec_millis());
                         Ok(Some(RuntimeValue::I32(1)))
                     },
                     Err(err) => {
                         info!("Set Error: {}", err);
+                        info!("SET_STATE Execution time: {} secs {} ms",
+                              timer.elapsed().as_secs(), timer.elapsed().subsec_millis());
                         Ok(Some(RuntimeValue::I32(0)))
                     }
-
                 }
             }
             DELETE_STATE_IDX => {
@@ -321,10 +332,8 @@ impl Externals for WasmExternals {
             }
             GET_PTR_LEN_IDX => {
                 let addr = args.nth(0);
-                info!("Getting pointer length\nraw {}", addr);
 
                 if let Some(ptr) = self.ptrs.get(&addr) {
-                    info!("ptr: {:?}", ptr);
                     Ok(Some(RuntimeValue::I32(ptr.length as i32)))
                 } else {
                     Ok(Some(RuntimeValue::I32(-1)))
@@ -342,9 +351,9 @@ impl Externals for WasmExternals {
             ALLOC_IDX => {
                 let len: i32 = args.nth(0);
 
-                info!("Allocating memory block of length: {}", len);
                 let raw_ptr = self.write_data(vec![0; len as usize])?;
-                info!("Block successfully allocated ptr: {}", raw_ptr as i32);
+                info!("ALLOC Execution time: {} secs {} ms",
+                      timer.elapsed().as_secs(), timer.elapsed().subsec_millis());
 
                 Ok(Some(RuntimeValue::I32(raw_ptr as i32)))
             }
@@ -425,32 +434,30 @@ impl Externals for WasmExternals {
                     Some(roles) => roles.clone(),
                     None => return Ok(Some(RuntimeValue::I32(-1)))
                 };
-                info!("SMART_PERMISSION 3");
                 let mut role_vec = Vec::new();
                 for role in roles {
                     let role_str = self.ptr_to_string(role).map_err(ExternalsError::from)?;
                     role_vec.push(role_str);
                 }
-                info!("SMART_PERMISSION 4");
+
                 let org_id = self.ptr_to_string(org_id_ptr as u32)?;
                 let public_key = self.ptr_to_string(public_key_ptr as u32)?;
                 let payload = self.ptr_to_vec(payload_ptr as u32)?;
                 let contract = self.ptr_to_vec(contract_ptr as u32)?;
 
-                info!("SMART_PERMISSION 5");
                 let cloned_context = self.context.clone();
                 let module =
                     SmartPermissionModule::new(&contract, cloned_context)
                         .expect("Failed to create can_add module");
-                info!("SMART_PERMISSION 6");
+
                 let result = module
                     .entrypoint(role_vec, org_id, public_key, payload.to_vec())
                     .map_err(|e| ExternalsError::from(format!("{:?}", e)))?;
 
-                info!("SMART_PERMISSION 7");
                 match result {
                     Some(x) => {
-                        info!("SMART_PERMISSION 8: {}", x);
+                        info!("SMART_PERMISSION Execution time: {} secs {} ms",
+                              timer.elapsed().as_secs(), timer.elapsed().subsec_millis());
                         Ok(Some(RuntimeValue::I32(x)))
                     }
                     None =>Err(ExternalsError::to_trap("No result returned".into()))

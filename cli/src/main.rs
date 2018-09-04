@@ -29,6 +29,7 @@ mod error;
 mod execute;
 mod key;
 mod namespace;
+mod smart_permission;
 mod protos;
 mod submit;
 mod transaction;
@@ -91,6 +92,31 @@ fn run() -> Result<(), error::CliError> {
             (@arg write: -w --write conflicts_with[delete] "Set write permission")
             (@arg wait: --wait +takes_value "A time in seconds to wait for batches to be committed")
         )
+        (@subcommand sp => 
+          (about: "Create, update or delete smart permissions")
+          (@arg url: -U --url +takes_value "URL to the Sawtooth REST API")
+          (@arg wait: --wait +takes_value "A time in seconds to wait for batches to be committed")
+          (@subcommand create =>
+                (@arg org_id: +required "Organization ID ")
+                (@arg name: +required "Name of the Smart Permission")
+                (@arg filename: -f --filename +required +takes_value "Path to smart_permission")
+                (@arg key: -k --key +takes_value "Signing key name")
+                (@arg output: --output -o +takes_value "File name to write payload to.")
+            )
+            (@subcommand update =>
+                (@arg org_id: +required "Organization IDs")
+                (@arg name: +required "Name of the Smart Permission")
+                (@arg filename: -f --filename +required +takes_value "Path to smart_permission")
+                (@arg key: -k --key +takes_value "Signing key name")
+                (@arg output: --output -o +takes_value "File name to write payload to.")
+            )
+            (@subcommand delete =>
+                (@arg org_id: +required "Organization IDs")
+                (@arg name: +required "Name of the Smart Permission")
+                (@arg key: -k --key +takes_value "Signing key name")
+                (@arg output: --output -o +takes_value "File name to write payload to.")
+            )
+        )
     ).get_matches();
 
     let (batch_link, mut wait) = if let Some(upload_matches) = matches.subcommand_matches("upload") {
@@ -135,12 +161,6 @@ fn run() -> Result<(), error::CliError> {
             }
         };
 
-        // let inputs = exec_matches
-        //     .value_of("inputs")
-        //     .unwrap_or("")
-        //     .split(":")
-        //     .map(|i| i.into())
-        //     .collect();
         let inputs = exec_matches
             .values_of("inputs")
             .map(|values| values.map(|v| v.into()).collect())
@@ -245,6 +265,51 @@ fn run() -> Result<(), error::CliError> {
             }
 
             namespace::do_perm_create(key_name, &url, &namespace, &contract, read, write)?
+        };
+
+        (batch_link, wait)
+    } else if let Some(sp_matches)  = matches.subcommand_matches("sp") {
+        let url = sp_matches
+            .value_of("url")
+            .unwrap_or("http://localhost:8008/");
+
+        let wait = match value_t!(sp_matches, "wait", u64) {
+            Ok(wait) => wait,
+            Err(err) => {
+                match err.kind{
+                    clap::ErrorKind::ArgumentNotFound => 0,
+                    _ => return Err(error::CliError::UserError(
+                        "Wait must be an integer".into()),
+                    )
+                }
+            }
+        };
+
+        let batch_link = match sp_matches.subcommand() {
+            ("create", Some(m)) => smart_permission::do_create(
+                url,
+                m.value_of("org_id").unwrap(),
+                m.value_of("name").unwrap(),
+                m.value_of("filename").unwrap(),
+                m.value_of("key"),
+                m.value_of("output")
+            )?,
+            ("update", Some(m)) => smart_permission::do_update(
+                url,
+                m.value_of("org_id").unwrap(),
+                m.value_of("name").unwrap(),
+                m.value_of("filename").unwrap(),
+                m.value_of("key"),
+                m.value_of("output")
+            )?,
+            ("delete", Some(m)) => smart_permission::do_delete(
+                url,
+                m.value_of("org_id").unwrap(),
+                m.value_of("name").unwrap(),
+                m.value_of("key"),
+                m.value_of("output")
+            )?,
+            _ => return Err(error::CliError::UserError("Unrecognized smart permission subcommand".into()))
         };
 
         (batch_link, wait)

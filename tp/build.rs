@@ -28,6 +28,7 @@ fn main() {
             "../protos/contract_registry.proto",
             "../protos/namespace_registry.proto",
             "../protos/contract.proto",
+            "../protos/smart_permission.proto",
         ],
         includes: &["../protos"],
         customize: Customize {
@@ -39,5 +40,6 @@ fn main() {
     file.write_all(b"pub mod contract;\n").unwrap();
     file.write_all(b"pub mod contract_registry;\n").unwrap();
     file.write_all(b"pub mod namespace_registry;\n").unwrap();
-    file.write_all(b"pub mod payload;\n").unwrap()
+    file.write_all(b"pub mod payload;\n").unwrap();
+    file.write_all(b"pub mod smart_permission;\n").unwrap();
 }

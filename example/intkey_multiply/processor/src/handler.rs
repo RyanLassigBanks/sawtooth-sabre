@@ -43,7 +43,7 @@ const MAX_VALUE: u32 = 4294967295;
 const MAX_NAME_LEN: usize = 20;
 
 #[cfg(target_arch = "wasm32")]
-const PARTICLE_NAMESPACE: &'static str = "cad11d";
+const PIKE_NAMESPACE: &'static str = "cad11d";
 
 fn get_intkey_prefix() -> String {
     let mut sha = Sha512::new();
@@ -593,10 +593,6 @@ impl TransactionHandler for IntkeyMultiplyTransactionHandler {
 }
 #[cfg(target_arch = "wasm32")]
 fn run_smart_permisson(state: &mut IntkeyState, signer: &str, payload: &[u8]) -> Result<i32, ApplyError> {
-    // get agent
-    // get org_id
-    // signer
-    // payload_byes
     let agent = match state.get_agent(signer)? {
         Some(agent) => agent,
         None => return Err(ApplyError::InvalidTransaction(format!(

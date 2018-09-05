@@ -178,33 +178,6 @@ pub fn create_transaction(
                 compute_agent_address(public_key),
             ])
         }
-        Action::CREATE_SMART_PERMISSION => {
-            let org_id = payload.get_create_smart_permission().get_org_id();
-            let name = payload.get_create_smart_permission().get_name();
-            protobuf::RepeatedField::from_vec(vec![
-                compute_smart_permission_address(org_id, name),
-                compute_org_address(org_id),
-                compute_agent_address(public_key),
-            ])
-        }
-        Action::UPDATE_SMART_PERMISSION => {
-            let org_id = payload.get_update_smart_permission().get_org_id();
-            let name = payload.get_update_smart_permission().get_name();
-            protobuf::RepeatedField::from_vec(vec![
-                compute_smart_permission_address(org_id, name),
-                compute_org_address(org_id),
-                compute_agent_address(public_key),
-            ])
-        }
-        Action::DELETE_SMART_PERMISSION => {
-            let org_id = payload.get_delete_smart_permission().get_org_id();
-            let name = payload.get_delete_smart_permission().get_name();
-            protobuf::RepeatedField::from_vec(vec![
-                compute_smart_permission_address(org_id, name),
-                compute_org_address(org_id),
-                compute_agent_address(public_key),
-            ])
-        }
         _ => protobuf::RepeatedField::from_vec(vec![String::from(PIKE_NAMESPACE)]),
     };
 

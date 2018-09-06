@@ -37,13 +37,13 @@ use protos::payload;
 use protos::payload::PikePayload_Action as Action;
 
 /// The Pike transaction family name (pike)
-const PARTICLE_FAMILY_NAME: &'static str = "pike";
+const PIKE_FAMILY_NAME: &'static str = "pike";
 
 /// The Pike transaction family version (0.1)
-const PARTICLE_FAMILY_VERSION: &'static str = "0.1";
+const PIKE_FAMILY_VERSION: &'static str = "0.1";
 
 /// The Pike namespace prefix for global state (cad11d)
-const PARTICLE_NAMESPACE: &'static str = "cad11d";
+const PIKE_NAMESPACE: &'static str = "cad11d";
 
 /// Creates a nonce appropriate for a TransactionHeader
 fn create_nonce() -> String {
@@ -75,7 +75,7 @@ fn compute_agent_address(name: &str) -> String {
     sha.input(name.as_bytes());
     sha.result(hash);
 
-    String::from(PARTICLE_NAMESPACE) + &resource_to_byte(Resource::AGENT)
+    String::from(PIKE_NAMESPACE) + &resource_to_byte(Resource::AGENT)
         + &bytes_to_hex_str(hash)[..62]
 }
 
@@ -91,7 +91,7 @@ fn compute_org_address(id: &str) -> String {
     sha.input(id.as_bytes());
     sha.result(hash);
 
-    String::from(PARTICLE_NAMESPACE) + &resource_to_byte(Resource::ORG)
+    String::from(PIKE_NAMESPACE) + &resource_to_byte(Resource::ORG)
         + &bytes_to_hex_str(hash)[..62]
 }
 
@@ -118,8 +118,8 @@ pub fn create_transaction(
     let mut txn = Transaction::new();
     let mut txn_header = TransactionHeader::new();
 
-    txn_header.set_family_name(String::from(PARTICLE_FAMILY_NAME));
-    txn_header.set_family_version(String::from(PARTICLE_FAMILY_VERSION));
+    txn_header.set_family_name(String::from(PIKE_FAMILY_NAME));
+    txn_header.set_family_version(String::from(PIKE_FAMILY_VERSION));
     txn_header.set_nonce(create_nonce());
     txn_header.set_signer_public_key(public_key.clone());
     txn_header.set_batcher_public_key(public_key.clone());
@@ -157,7 +157,7 @@ pub fn create_transaction(
                 compute_agent_address(public_key),
             ])
         }
-        _ => protobuf::RepeatedField::from_vec(vec![String::from(PARTICLE_NAMESPACE)]),
+        _ => protobuf::RepeatedField::from_vec(vec![String::from(PIKE_NAMESPACE)]),
     };
 
     txn_header.set_inputs(addresses.clone());

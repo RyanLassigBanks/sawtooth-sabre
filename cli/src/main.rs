@@ -168,8 +168,6 @@ fn run() -> Result<(), error::CliError> {
                 "exec action requires one or more --inputs arguments".into(),
             ))?;
 
-
-        println!("{:?}", inputs);
         let outputs = exec_matches
             .values_of("outputs")
             .map(|values| values.map(|v| v.into()).collect()).ok_or(error::CliError::UserError(

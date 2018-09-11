@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -31,10 +31,21 @@ use std::error::Error as StdError;
 const INTKEY_MULTIPLY_DEF: &str =
     "/project/example/intkey_multiply/intkey_multiply.yaml";
 
+const PIKE_DEF: &str = "/project/contracts/sawtooth-pike/pike.yaml"; 
+
+const INTKEY_SMART_PERMISSION: &str =
+    "/project/contracts/sawtooth-pike/examples/intkey/target/wasm32-unknown-unknown/release/intkey.wasm";
+
 // Path to a payload to multiply intkey value B and C and store in A.
 const GOOD_PAYLOAD: &str = "/project/integration/payloads/A_B_C_payload";
 // Path to a payload to multiply intkey value C and nonexisties and store in A.
 const BAD_PAYLOAD: &str = "/project/integration/payloads/A_Bad_C_payload";
+
+/// Path to a Pike payload to create the Cargill Organization
+///
+/// Created using the following command
+/// pike-cli org create Cargill000 Cargill Address --output create_org
+const CREATE_ORG_PAYLOAD: &str = "/project/integration/payloads/create_org";
 
 #[derive(Debug)]
 pub enum TestError {
@@ -66,7 +77,17 @@ impl std::fmt::Display for TestError {
 // Execute the sabre cli command and parses the output returned to stdout.
 fn sabre_cli(command: String) -> Result<Value, TestError> {
     let mut command_vec = command.split(" ").collect::<Vec<&str>>();
-    command_vec.append(&mut vec!("--url", "http://rest-api:9708", "--wait", "300"));
+
+    if !command_vec.contains(&"--url") {
+        command_vec.append(&mut vec!("--url", "http://rest-api:9708"));
+    }
+
+    if !command_vec.contains(&"--wait") {
+        command_vec.append(&mut vec!("--wait", "300"));
+    }
+
+    println!("command {}", command);
+
     let x = Exec::cmd("sabre").args(&command_vec).stream_stdout()
         .map_err(|err| TestError::TestError(err.to_string()))?;
     let br = BufReader::new(x);
@@ -85,12 +106,40 @@ fn sabre_cli(command: String) -> Result<Value, TestError> {
     return Err(TestError::TestError("No response received".into()))
 }
 
+fn pike_setup() -> Result<(), TestError> {
+    // Configure Pike Smart Contract and upload int key smart permission
+    //
+    // 1) Upload Pike smart contract
+    // 2) Create namespace cad11d
+    // 3) Create namespace 00ec03
+    // 4) Add read and write perms for cad11d for pike
+    // 5) Add read and write perms for cad11d for intkey_multiply
+    // 6) Add read and write perms for 00ec03 for intkey_multiply
+    // 7) Create cargill organization
+    //
+    println!("Uploading Pike smart contract");
+    let _ = sabre_cli(format!("upload --filename {}", PIKE_DEF))?;
+
+    println!("Creating Pike namespace");
+    let _ = sabre_cli("ns --create cad11d --owner test_owner".to_string())?;
+
+    println!("Configuring pike permissions");
+    let _ = sabre_cli("perm cad11d pike --read --write".to_string())?;
+
+    Ok(())
+}
+
 /// The following test tests the Sabre Cli, Sabre Transaction Processor and the Intkey Multiply
 /// example smart contract.
 /// The tests executes sabre cli commands to upload and executes the smart contract and then
 /// checks that they are correctly either committed or invalid.
 #[test]
 fn test_sabre() {
+
+    if let Err(err) = pike_setup() {
+        panic!(format!("Pike setup error {}", err));
+    }
+
     // Test that Sabre will return an invalid transaction when the Contract does not
     // exist
     //
@@ -128,6 +177,7 @@ fn test_sabre() {
     };
     assert!(response["data"][0]["status"]=="COMMITTED");
 
+
     // Test that Sabre will return an invalid transaction when the NamespaceRegistry does not
     // exist
     //
@@ -161,6 +211,20 @@ fn test_sabre() {
         Err(err) => panic!(format!("No Response {}", err))
     };
     assert!(response["data"][0]["status"]=="COMMITTED");
+
+    // Test that Sabre will set a new Namespace Registry.
+    //
+    // Send CreateNamespaceRegistryAction with the following:
+    //      Namespace: 00ec03
+    //      Owner: test_owner
+    //
+    // Result: Committed
+    let response = match sabre_cli("ns --create 00ec03 --owner test_owner".to_string()){
+        Ok(x) => x,
+        Err(err) => panic!(format!("No Response {}", err))
+    };
+    assert!(response["data"][0]["status"]=="COMMITTED");
+
 
     // Test that Sabre will return an invalid transaction when the Contract does not
     // have permissions to access the namespace.
@@ -199,6 +263,59 @@ fn test_sabre() {
         };
     assert!(response["data"][0]["status"]=="COMMITTED");
 
+    // Test that Sabre will add a permission to the inktey namespace registry to give Intkey
+    // Multiply read and write permissions.
+    //
+    // Send CreateNamespaceRegistryPermissionAction with the following:
+    //      Namespace: cad11d
+    //      Contract_name: intkey_multiply
+    //      Read: true
+    //      Write: true
+    //
+    // Result: Committed
+    let response = match sabre_cli("perm cad11d intkey_multiply --read --write".to_string()) {
+            Ok(x) => x,
+            Err(err) => panic!(format!("No Response {}", err))
+        };
+    assert!(response["data"][0]["status"]=="COMMITTED");
+
+    // Test that Sabre will add a permission to the inktey namespace registry to give Intkey
+    // Multiply read and write permissions.
+    //
+    // Send CreateNamespaceRegistryPermissionAction with the following:
+    //      Namespace: 00ec03
+    //      Contract_name: intkey_multiply
+    //      Read: true
+    //      Write: true
+    //
+    // Result: Committed
+    let response = match sabre_cli("perm 00ec03 intkey_multiply --read --write".to_string()) {
+            Ok(x) => x,
+            Err(err) => panic!(format!("No Response {}", err))
+        };
+    assert!(response["data"][0]["status"]=="COMMITTED");
+
+    let response = match sabre_cli(format!(
+            "exec --contract pike:1.0 --payload {} --inputs cad11d --outputs cad11d",
+            CREATE_ORG_PAYLOAD)) {
+        Ok(x) => x,
+        Err(err) => panic!(format!("No Response {}", err))
+    };
+    assert!(response["data"][0]["status"]=="COMMITTED");
+
+    // Test that Sabre will add a smart permission 
+    //
+    // Send CreateSmartPermissionAction with the following:
+    //      name: test 
+    //      org_id: Cargill000
+    //
+    // Result: Committed
+    let response = match sabre_cli(format!("sp --url http://rest-api:9708 --wait 300 create Cargill000 test --filename {}", INTKEY_SMART_PERMISSION)) {
+            Ok(x) => x,
+            Err(err) => panic!(format!("No Response {}", err))
+        };
+    assert!(response["data"][0]["status"]=="COMMITTED");
+
     // Test that Sabre will successfully execute the contract.
     //
     // Send ExecuteContractAction with the following:
@@ -210,7 +327,7 @@ fn test_sabre() {
     //
     // Result: Committed. Set Inktey State.
     let response = match sabre_cli("exec --contract intkey_multiply:1.0 --payload ".to_string() +
-        &GOOD_PAYLOAD + " --inputs 1cf126 --outputs 1cf126") {
+        &GOOD_PAYLOAD + " --inputs 1cf126 cad11d 00ec03 --outputs 1cf126") {
             Ok(x) => x,
             Err(err) => panic!(format!("No Response {}", err))
         };
@@ -228,7 +345,7 @@ fn test_sabre() {
     //
     // Result: Invalid Transaction, CWasm contract returned invalid transaction
     let response = match sabre_cli("exec --contract intkey_multiply:1.0 --payload ".to_string() +
-        &GOOD_PAYLOAD + " --inputs 1cf126 --outputs 1cf126") {
+        &GOOD_PAYLOAD + " --inputs 1cf126 cad11d 00ec03 --outputs 1cf126") {
             Ok(x) => x,
             Err(err) => panic!(format!("No Response {}", err))
         };
@@ -249,7 +366,7 @@ fn test_sabre() {
     //
     // Result: Invalid Transaction, Wasm contract returned invalid transaction
     let response = match sabre_cli("exec --contract intkey_multiply:1.0 --payload ".to_string() +
-        &BAD_PAYLOAD + " --inputs 1cf126 --outputs 1cf126") {
+        &BAD_PAYLOAD + " --inputs 1cf126 cad11d 00ec03 --outputs 1cf126") {
             Ok(x) => x,
             Err(err) => panic!(format!("No Response {}", err))
         };

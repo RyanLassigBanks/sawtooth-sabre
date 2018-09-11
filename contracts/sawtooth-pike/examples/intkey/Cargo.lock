@@ -2,7 +2,7 @@
 name = "intkey"
 version = "0.1.0"
 dependencies = [
- "sabre-sdk 0.1.0",
+ "sabre-sdk 0.1.3",
 ]
 
 [[package]]
@@ -12,7 +12,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "sabre-sdk"
-version = "0.1.0"
+version = "0.1.3"
 dependencies = [
  "protobuf 2.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
